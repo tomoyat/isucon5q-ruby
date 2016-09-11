@@ -1,3 +1,4 @@
+# coding: utf-8
 require 'sinatra/base'
 require 'mysql2'
 require 'mysql2-cs-bind'
@@ -101,8 +102,8 @@ SQL
 
     def is_friend?(another_id)
       user_id = session[:user_id]
-      query = 'SELECT COUNT(1) AS cnt FROM relations WHERE (one = ? AND another = ?) OR (one = ? AND another = ?)'
-      cnt = db.xquery(query, user_id, another_id, another_id, user_id).first[:cnt]
+      query = 'SELECT COUNT(1) AS cnt FROM relations WHERE (one = ? AND another = ?)'
+      cnt = db.xquery(query, user_id, another_id).first[:cnt]
       cnt.to_i > 0 ? true : false
     end
 
@@ -198,10 +199,10 @@ SQL
       break if comments_of_friends.size >= 10
     end
 
-    friends_query = 'SELECT * FROM relations WHERE one = ? OR another = ? ORDER BY created_at DESC'
+    friends_query = 'SELECT * FROM relations WHERE one = ? ORDER BY created_at DESC'
     friends_map = {}
-    db.xquery(friends_query, current_user[:id], current_user[:id]).each do |rel|
-      key = (rel[:one] == current_user[:id] ? :another : :one)
+    db.xquery(friends_query, current_user[:id]).each do |rel|
+      key = :another
       friends_map[rel[key]] ||= rel[:created_at]
     end
     friends = friends_map.map{|user_id, created_at| [user_id, created_at]}
@@ -337,10 +338,10 @@ SQL
 
   get '/friends' do
     authenticated!
-    query = 'SELECT * FROM relations WHERE one = ? OR another = ? ORDER BY created_at DESC'
+    query = 'SELECT * FROM relations WHERE one = ? ORDER BY created_at DESC'
     friends = {}
-    db.xquery(query, current_user[:id], current_user[:id]).each do |rel|
-      key = (rel[:one] == current_user[:id] ? :another : :one)
+    db.xquery(query, current_user[:id]).each do |rel|
+      key = :another
       friends[rel[key]] ||= rel[:created_at]
     end
     list = friends.map{|user_id, created_at| [user_id, created_at]}
