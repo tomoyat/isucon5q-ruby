@@ -181,12 +181,21 @@ LIMIT 10
 SQL
     comments_for_me = db.xquery(comments_for_me_query, current_user[:id])
 
+    friends_query = 'SELECT * FROM relations WHERE one = ? ORDER BY created_at DESC'
+    friends_map = {}
+    friends_list = []
+    db.xquery(friends_query, current_user[:id]).each do |rel|
+      key = :another
+      friends_list.push(rel[:another])
+      friends_map[rel[key]] ||= rel[:created_at]
+    end
+    friends = friends_map.map{|user_id, created_at| [user_id, created_at]}
+
     entries_of_friends = []
-    db.query('SELECT * FROM entries ORDER BY created_at DESC LIMIT 1000').each do |entry|
-      next unless is_friend?(entry[:user_id])
+    entries_query = 'SELECT * FROM entries WHERE user_id in (?) ORDER BY created_at DESC LIMIT 10'
+    db.xquery(entries_query, friends_list).each do |entry|
       entry[:title] = entry[:body].split(/\n/).first
       entries_of_friends << entry
-      break if entries_of_friends.size >= 10
     end
 
     comments_of_friends = []
@@ -199,13 +208,6 @@ SQL
       break if comments_of_friends.size >= 10
     end
 
-    friends_query = 'SELECT * FROM relations WHERE one = ? ORDER BY created_at DESC'
-    friends_map = {}
-    db.xquery(friends_query, current_user[:id]).each do |rel|
-      key = :another
-      friends_map[rel[key]] ||= rel[:created_at]
-    end
-    friends = friends_map.map{|user_id, created_at| [user_id, created_at]}
 
     query = <<SQL
 SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
