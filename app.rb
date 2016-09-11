@@ -199,15 +199,19 @@ SQL
     end
 
     comments_of_friends = []
-    c_query = 'SELECT * FROM comments WHERE user_id in (?) ORDER BY created_at DESC LIMIT 1000'
-    db.xquery(c_query, friends_list).each do |comment|
-      entry = db.xquery('SELECT * FROM entries WHERE id = ?', comment[:entry_id]).first
-      entry[:is_private] = (entry[:private] == 1)
-      next if entry[:is_private] && !permitted?(entry[:user_id])
-      comments_of_friends << comment
+    50.times do |idx|
+      c_query = "SELECT * FROM comments WHERE user_id in (?) ORDER BY created_at DESC LIMIT 20 OFFSET #{idx * 50}"
+      comment_list = db.xquery(c_query, friends_list)
+      break if comment_list.size <= 0
+      comment_list.each do |comment|
+        entry = db.xquery('SELECT * FROM entries WHERE id = ?', comment[:entry_id]).first
+        entry[:is_private] = (entry[:private] == 1)
+        next if entry[:is_private] && !permitted?(entry[:user_id])
+        comments_of_friends << comment
+        break if comments_of_friends.size >= 10
+      end
       break if comments_of_friends.size >= 10
     end
-
 
     query = <<SQL
 SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
