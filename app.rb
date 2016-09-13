@@ -4,6 +4,8 @@ require 'mysql2'
 require 'mysql2-cs-bind'
 require 'tilt/erubis'
 require 'erubis'
+require 'redis'
+require 'json'
 
 module Isucon5
   class AuthenticationError < StandardError; end
@@ -36,6 +38,13 @@ class Isucon5::WebApp < Sinatra::Base
           database: ENV['ISUCON5_DB_NAME'] || 'isucon5q',
         },
       }
+    end
+
+    def redis_cli
+      return Thread.current[:redis_cli] if Thread.current[:redis_cli]
+      client = Redis.new(:host => "127.0.0.1", :port => 6379, :db => 15)
+      Thread.current[:redis_cli] = client
+      client
     end
 
     def db
@@ -89,7 +98,8 @@ SQL
     end
 
     def get_user(user_id)
-      user = db.xquery('SELECT * FROM users WHERE id = ?', user_id).first
+#      user = db.xquery('SELECT * FROM users WHERE id = ?', user_id).first unless user
+      user = JSON.parse(redis_cli.get(user_id.to_i), {:symbolize_names => true})
       raise Isucon5::ContentNotFound unless user
       user
     end
@@ -367,6 +377,12 @@ SQL
   end
 
   get '/initialize' do
+    redis_cli.flushdb
+    users = db.query("select * from users")
+    users.each do |user|
+      redis_cli.set(user[:id], user.to_json)
+    end
+
     db.query("DELETE FROM relations WHERE id > 500000")
     db.query("DELETE FROM footprints WHERE id > 500000")
     db.query("DELETE FROM entries WHERE id > 500000")
